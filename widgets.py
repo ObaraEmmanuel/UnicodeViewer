@@ -1,7 +1,7 @@
-from tkinter import Label, Entry, StringVar
+from tkinter import Label, Entry, StringVar, Frame, Canvas, ttk, Menu
 import re
 
-UNICODE_HEXADECIMAL = re.compile(r'[0-9a-f]{0,4}$')
+UNICODE_HEXADECIMAL = re.compile(r'[0-9a-f]{1,4}$')
 
 
 class NavControl(Label):
@@ -35,7 +35,7 @@ class HexadecimalIntegerControl(Entry):
         )
 
     def get(self) -> int:
-        val = super().get()
+        val = self._data.get()
         if val.isdigit():
             return int(val)
         if re.match(UNICODE_HEXADECIMAL, val):
@@ -55,39 +55,58 @@ class HexadecimalIntegerControl(Entry):
         return False
 
 
-class Grid(Label):
+def text_required(func):
+    def wrap(self, *args):
+        if not self.text:
+            pass
+        else:
+            return func(self, *args)
+
+    wrap.__name__ = func.__name__
+    wrap.__doc__ = func.__doc__
+    return wrap
+
+
+class Grid(Frame):
 
     def __init__(self, app, **cnf):
-        super().__init__(app.body, **cnf)
+        super().__init__(app.body)
         self.app = app
-        self.config(height=2, width=4, font='Arial 12', bg="#f7f7f7")
-        self.bind('<Enter>', lambda ev: self.hover(True))
-        self.bind('<Leave>', lambda ev: self.hover(False))
-        self.bind('<Button-1>', lambda ev: self.lock())
-        self.bind('<Button-3>', lambda ev: self.request_menu(ev))
+        self._text = Label(self, bg="#f7f7f7", **cnf)
+        self._text.pack(fill='both', expand=True)
+        self.config(bg="#f7f7f7", width=40, height=38)
+        self._text.bind('<Enter>', lambda ev: self.hover(True))
+        self._text.bind('<Leave>', lambda ev: self.hover(False))
+        self._text.bind('<Button-1>', lambda ev: self.lock())
+        self._text.bind('<Button-3>', lambda ev: self.request_menu(ev))
         self.text = ""
         self.is_locked = False
+        self.pack_propagate(0)
 
-    def assert_is_active(self, func):
-        text = self.text
+    @property
+    def font(self):
+        regex = re.compile(r'{(.+)}')
+        if re.match(regex, self['font']):
+            return re.search(regex, self['font']).group(1)
+        else:
+            return self['font'].split()[0]
 
-        def wrap(*args):
-            if not text:
-                pass
-            else:
-                return func(*args)
+    def __getitem__(self, item):
+        return self._text[item]
 
-        wrap.__name__ = func.__name__
-        wrap.__doc__ = func.__doc__
-        return wrap
+    def __setitem__(self, key, value):
+        self._text[key] = value
 
     def copy(self, flag: int):
         self.clipboard_clear()
         if flag == 0:
+            # Copy unicode
             self.clipboard_append(self["text"])
         elif flag == 1:
+            # Copy hexadecimal scalar
             self.clipboard_append(self.text.replace("0x", ""))
         elif flag == 2:
+            # Copy code point
             self.clipboard_append(str(int(self.text, 16)))
 
     def set(self, value: int):
@@ -97,9 +116,8 @@ class Grid(Label):
         self["text"] = chr(value)
         self.text = str(hex(value))
 
+    @text_required
     def hover(self, flag=True):
-        if not self.text:
-            return
         if flag:
             self["bg"] = "#bbb"
             self.app.activate_grid(self)
@@ -111,17 +129,80 @@ class Grid(Label):
         self.app.active_grid = None
         self['bg'] = "#f7f7f7"
 
+    @text_required
     def request_menu(self, event=None):
-        if not self.text:
-            return
         self.lock()
-        self.app.request_context_menu(self, event)
+        self.app.request_context_menu(event)
 
+    @text_required
     def lock(self):
-        if not self.text:
-            return
         if self.app.active_grid:
             self.app.active_grid.unlock()
         self.is_locked = True
         self.app.active_grid = self
         self["bg"] = "#bbb"
+
+    @property
+    def data(self):
+        return {
+            "Font family": self.font,
+            "Code point": str(int(self.text, 16)),
+            "Hexadecimal scalar": self.text.replace("0x", ""),
+            "Surrogate pair": "None",
+            "Plane": "Basic Multilingual",
+            "Block": "Unknown"
+        }
+
+
+class ContextMenu(Menu):
+
+    def __init__(self):
+        super().__init__()
+        self.config(bg="#5a5a5a", tearoff=0, fg="#f7f7f7", activebackground="#f7f7f7",
+                    activeforeground="#5a5a5a", bd=0, relief='flat', font='calibri 12')
+
+    def load_actions(self, *actions):
+        for action in actions:
+            if action[0] == 'separator':
+                self.add_separator()
+            else:
+                icon, label, command = action
+                self.add_command(label='   '.join([icon, label]), command=command)
+
+
+class KeyValueLabel(Frame):
+
+    def __init__(self, master, key, value, **cnf):
+        super().__init__(master, **cnf)
+        self['bg'] = "#f7f7f7"
+        self._key = Label(self, bg="#f7f7f7", fg="#5a5a5a", font=('calibri', 11), anchor='w', text=key)
+        self._key.pack(side='left')
+        self._val = Label(self, bg="#f7f7f7", fg="#bbb", font=('calibri', 11), anchor='w', text=value)
+        self._val.pack(side='left')
+        self._copy = Label(self, bg="#f7f7f7", fg="#5a5a5a", font=('calibri', 11), anchor='w', text='\ue923')
+        self._copy.pack(side='right', padx=3)
+        self._copy.bind('<Button-1>', self.copy)
+
+    def copy(self, _):
+        self.clipboard_clear()
+        self.clipboard_append(self._val['text'])
+
+
+class ScrolledGridHolder(Frame):
+
+    def __init__(self, master, **cnf):
+        super().__init__(master, **cnf)
+        self.canvas = Canvas(self, highlightthickness=0, **cnf)
+        self.canvas.pack(side="top", fill="both", expand=True)
+        self.scroll = ttk.Scrollbar(self, orient='horizontal', command=self.canvas.xview)
+        self.scroll.pack(side='top', fill='x', expand=True)
+        self.canvas['xscrollcommand'] = self.scroll.set
+        self.body = Frame(self, bg=self['bg'])
+        self.window = self.canvas.create_window(0, 0, anchor='nw', window=self.body)
+        self.tk = self.body.tk
+        self.bind('<Configure>', self.on_configure)
+
+    def on_configure(self, event):
+        self.canvas.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+        self.canvas.update_idletasks()
