@@ -1,11 +1,21 @@
 from tkinter import *
 import tkinter.ttk as ttk
 import components as Components
-from widgets import Grid
+from widgets import Grid, ContextMenu
 from threading import Thread
 from copy import copy
+import dialogs
+import shelve
 
 MAX_GRID_WIDTH, MAX_GRID_HEIGHT = 20, 10
+
+
+def add_to_favourites(grid: Grid) -> None:
+    with shelve.open("data") as data:
+        if "favourites" in data:
+            data["favourites"] += [(int(grid.text, 16), grid.font)]
+        else:
+            data["favourites"] = [(int(grid.text, 16), grid.font)]
 
 
 # noinspection PyArgumentList
@@ -23,18 +33,15 @@ class App(Tk):
         self.body.place(rely=0.101, x=0, relwidth=1, relheight=0.9)
         self.body.bind('<Leave>', lambda ev: self.deactivate_grid())
         self.body.bind('<Button-3>', lambda ev: print('context menu requested.'))
-        self.context_menu = Menu(bg="#5a5a5a", tearoff=0, fg="#f7f7f7", activebackground="#f7f7f7",
-                                 activeforeground="#5a5a5a", bd=0, relief='flat', font='calibri 12')
-        self.context_menu.add_command(label="\ue923   Copy unicode",
-                                      command=lambda: self.active_grid.copy(0))
-        self.context_menu.add_command(label="\ue923   Copy code point",
-                                      command=lambda: self.active_grid.copy(2))
-        self.context_menu.add_command(label="\ue923   Copy hexadecimal scalar",
-                                      command=lambda: self.active_grid.copy(1))
-        self.context_menu.add_separator()
-        self.context_menu.add_command(label="\ue7a9   Save as image")
-        self.context_menu.add_command(label="\ue735   add to favorites")
-        self.context_menu.add_command(label="\ue946   unicode info")
+        self.context_menu = ContextMenu()
+        self.context_menu.load_actions(("\ue923", "Copy unicode", lambda: self.active_grid.copy(0)),
+                                       ("\ue923", "Copy code point", lambda: self.active_grid.copy(2)),
+                                       ("\ue923", "Copy hexadecimal scalar", lambda: self.active_grid.copy(1)),
+                                       ('separator',),
+                                       ("\ue7a9", "Save as image", lambda: dialogs.SaveAsImage(self)),
+                                       ("\ue735", "add to favorites", lambda: add_to_favourites(self.active_grid)),
+                                       ("\ue946", "unicode info", lambda: dialogs.UnicodeInfo(self))
+                                       )
         self._size = (MAX_GRID_WIDTH, MAX_GRID_HEIGHT)
         self.grids = []
         self.grid_cluster = []
@@ -46,6 +53,8 @@ class App(Tk):
             Components.InputBox(self),
             Components.GridTracker(self),
             Components.RenderSizeControl(self),
+            Components.FontSelector(self),
+            Components.FavouritesManager(self)
         ]
         self._from = 0
         self.render_thread = None
@@ -60,6 +69,10 @@ class App(Tk):
 
     @size.setter
     def size(self, value: (int, int)):
+        if value[0] > MAX_GRID_WIDTH:
+            raise ValueError("Width set exceeds maximum: {}".format(MAX_GRID_WIDTH))
+        elif value[1] > MAX_GRID_HEIGHT:
+            raise ValueError("Height set exceeds maximum: {}".format(MAX_GRID_HEIGHT))
         if self.size == value:
             return
         self._size = value
@@ -69,7 +82,6 @@ class App(Tk):
         for column in self.grids[w_lower_bound: w_lower_bound + value[0]]:
             for grid in column[h_lower_bound: h_lower_bound + value[1]]:
                 self.grid_cluster.append(grid)
-        self.clear_grids()
         self.render(self._from)
         for component in self.components:
             component.size_changed()
@@ -83,7 +95,7 @@ class App(Tk):
         for i in range(self.size[0]):
             column = []
             for j in range(self.size[1]):
-                grid = Grid(self, font='calibri 12')
+                grid = Grid(self)
                 column.append(grid)
                 self.grid_cluster.append(grid)
                 grid.grid(row=j, column=i)
@@ -93,13 +105,14 @@ class App(Tk):
     def current_range(self) -> [int, int]:
         return [self._from, self._from + self.size[0] * self.size[1]]
 
-    def _render(self, from_: int, prev_thread: Thread) -> None:
+    def _render(self, from_: int, prev_thread: Thread = None) -> None:
         if from_ > 0xffff:
             return
         if prev_thread:
             prev_thread.join()
         self._from = from_
         self.propagate_change()
+        self.clear_grids()
         cluster = copy(self.grid_cluster)
         if self.active_grid:
             self.active_grid.unlock()
@@ -129,7 +142,7 @@ class App(Tk):
         self.render_thread = Thread(target=self._render, args=(from_, self.render_thread))
         self.render_thread.start()
 
-    def request_context_menu(self, grid: Grid, event):
+    def request_context_menu(self, event):
         try:
             self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
