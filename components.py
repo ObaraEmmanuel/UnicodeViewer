@@ -1,5 +1,6 @@
-from tkinter import Frame, Label, ttk
+from tkinter import Frame, Label, ttk, font, StringVar
 from widgets import NavControl, HexadecimalIntegerControl, Grid
+import dialogs
 
 
 class Component:
@@ -30,7 +31,8 @@ class InputBox(Component):
         self.input = HexadecimalIntegerControl(self.nav, font='calibri 12', width=6, fg="#5a5a5a", bg="#f7f7f7",
                                                bd=1, relief='flat')
         self.input.pack(side="left", padx=3)
-        self.draw = NavControl(self.nav, text=u'\ue8ee')
+        self.input.bind('<Return>', lambda _: self.render_range())
+        self.draw = NavControl(self.nav, text=u'\ue895')
         self.draw.pack(side="left")
         self.draw.run = self.render_range
         self.render()
@@ -50,16 +52,17 @@ class GridTracker(Component):
         self.info = Label(self.app.nav, bg="#5a5a5a", font="calibri 12", fg="#f7f7f7", width=9)
         self.info.pack(side='right')
         self.render()
+        self.text = ""
 
     def render(self):
         self.nav.pack(side="right")
 
     def receive_grid(self, grid: Grid):
         if grid is None:
-            self.info["text"] = ""
+            self.info["text"] = self.text = ""
             return
-        text = grid.text if grid.text else "0x0"
-        self.info["text"] = "{} : {}".format(chr(int(text, 16)), text.replace("0x0", ""))
+        self.text = grid.text
+        self.info["text"] = "{} : {}".format(chr(int(grid.text, 16)), grid.text.replace("0x", ""))
 
 
 class RenderSizeControl(Component):
@@ -110,3 +113,37 @@ class Swipe(Component):
     def prev_render(self):
         spread = self.app.current_range
         self.app.render(spread[0] - (spread[1] - spread[0]))
+
+
+class FontSelector(Component):
+
+    def __init__(self, app):
+        super().__init__(app)
+        self.var = StringVar()
+        self.var.trace('w', self.value_changed)
+        Label(self.nav, font='calibri 11', text='font family', bg='#5a5a5a', fg='#f7f7f7', width=12).pack(side='top')
+        self.input = ttk.Combobox(self.nav, values=self._get_fonts(), style='kim.TCombobox',
+                                  width=15, textvariable=self.var)
+        self.input.pack(side='top')
+        self.input.set('Arial')
+        self.render()
+
+    def value_changed(self, *_):
+        for column in self.app.grids:
+            for grid in column:
+                grid['font'] = (self.var.get(), 12)
+
+    def _get_fonts(self):
+        fonts = sorted(list(font.families()))
+        fonts = list(filter(lambda x: not x.startswith("@"), fonts))
+        return fonts
+
+
+class FavouritesManager(Component):
+
+    def __init__(self, app):
+        super().__init__(app)
+        fav = NavControl(self.nav, text="\ue735")
+        fav.pack(side='right', padx=3)
+        fav.run = lambda: dialogs.ManageFavourites(app)
+        self.render()
