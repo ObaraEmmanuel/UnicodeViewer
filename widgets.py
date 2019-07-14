@@ -67,21 +67,18 @@ def text_required(func):
     return wrap
 
 
-class Grid(Frame):
+class Grid(Label):
 
     def __init__(self, app, **cnf):
-        super().__init__(app.body)
+        super().__init__(app.body, **cnf)
         self.app = app
-        self._text = Label(self, bg="#f7f7f7", **cnf)
-        self._text.pack(fill='both', expand=True)
-        self.config(bg="#f7f7f7", width=40, height=38)
-        self._text.bind('<Enter>', lambda ev: self.hover(True))
-        self._text.bind('<Leave>', lambda ev: self.hover(False))
-        self._text.bind('<Button-1>', lambda ev: self.lock())
-        self._text.bind('<Button-3>', lambda ev: self.request_menu(ev))
+        self.config(bg="#f7f7f7")
+        self.bind('<Enter>', lambda ev: self.hover(True))
+        self.bind('<Leave>', lambda ev: self.hover(False))
+        self.bind('<Button-1>', lambda ev: self.lock())
+        self.bind('<Button-3>', lambda ev: self.request_menu(ev))
         self.text = ""
         self.is_locked = False
-        self.pack_propagate(0)
 
     @property
     def font(self):
@@ -91,11 +88,9 @@ class Grid(Frame):
         else:
             return self['font'].split()[0]
 
-    def __getitem__(self, item):
-        return self._text[item]
-
-    def __setitem__(self, key, value):
-        self._text[key] = value
+    @property
+    def code_point(self):
+        return ord(self['text'])
 
     def copy(self, flag: int):
         self.clipboard_clear()
@@ -159,7 +154,8 @@ class ContextMenu(Menu):
     def __init__(self):
         super().__init__()
         self.config(bg="#5a5a5a", tearoff=0, fg="#f7f7f7", activebackground="#f7f7f7",
-                    activeforeground="#5a5a5a", bd=0, relief='flat', font='calibri 12')
+                    activeforeground="#5a5a5a", bd=0, relief='flat', font='calibri 12',
+                    disabledforeground="#6a6a6a")
 
     def load_actions(self, *actions):
         for action in actions:
@@ -201,8 +197,9 @@ class ScrolledGridHolder(Frame):
         self.window = self.canvas.create_window(0, 0, anchor='nw', window=self.body)
         self.tk = self.body.tk
         self.bind('<Configure>', self.on_configure)
+        self.event_generate('<Configure>')
 
-    def on_configure(self, event):
+    def on_configure(self, _):
         self.canvas.update_idletasks()
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
         self.canvas.update_idletasks()

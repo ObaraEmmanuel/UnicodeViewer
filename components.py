@@ -22,6 +22,10 @@ class Component:
     def size_changed(self):
         pass
 
+    def uninstall(self):
+        self.nav.pack_forget()
+        self.app.components.remove(self)
+
 
 class InputBox(Component):
 
@@ -131,7 +135,7 @@ class FontSelector(Component):
     def value_changed(self, *_):
         for column in self.app.grids:
             for grid in column:
-                grid['font'] = (self.var.get(), 12)
+                grid['font'] = (self.input.get(), 12)
 
     def _get_fonts(self):
         fonts = sorted(list(font.families()))

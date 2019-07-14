@@ -30,8 +30,11 @@ class BaseDialog(Toplevel):
         self.wm_transient(app)
         self.config(bg='#5a5a5a')
         self.resizable(0, 0)
-        self.grab_set()
-        self.focus_force()
+        try:
+            self.grab_set()
+            self.focus_force()
+        except Exception:
+            pass
         self.app = app
         self.grid = app.active_grid
         self.body = Frame(self, bg='#f7f7f7')
@@ -40,6 +43,7 @@ class BaseDialog(Toplevel):
         self.button_holder.pack(side='top', fill='x', expand=True)
         self.centered = False
         self.bind('<Configure>', lambda _: self.center())
+        self.event_generate('<Configure>')
 
     def center(self):
         if not self.centered:
@@ -51,7 +55,7 @@ class UnicodeInfo(BaseDialog):
 
     def __init__(self, app):
         super().__init__(app)
-        data = self.grid.data
+        self.data = data = self.grid.data
         Label(self.body, font=(self.grid.font, 28), bg="#5a5a5a", text=self.grid['text'],
               width=5, height=2, fg='#f7f7f7').grid(row=0, column=0, rowspan=len(data), sticky='nesw', padx=5, pady=5)
         # Render the grids data
@@ -79,6 +83,7 @@ class SaveAsImage(BaseDialog):
         ttk.Button(self.button_holder, text="Save", command=self.save).pack(side='left', padx=5, pady=5)
         ttk.Button(self.button_holder, text="Cancel", command=self.destroy).pack(side='left', padx=5, pady=5)
         self.image = None
+        self.title("Save as image")
 
     def snip_img(self):
         self.update_idletasks()
@@ -89,11 +94,11 @@ class SaveAsImage(BaseDialog):
         x2 = self.image_label.winfo_width() + x1
         y2 = self.image_label.winfo_height() + y1
         image = ImageGrab.grab((x1, y1, x2, y2))
-        return image
+        self.image = image
 
     def save(self):
         if self.image is None:
-            self.image = self.snip_img()
+            self.snip_img()
         path = filedialog.asksaveasfilename(parent=self, initialfile="unicd.png",
                                             filetypes=[("Portable Network Graphics", "*.png")],
                                             initialdir=local_picture_location())
@@ -148,34 +153,45 @@ class ManageFavourites(BaseDialog):
             component.receive_grid(self.active_grid)
 
     def remove(self):
-        with shelve.open("data") as data:
-            if "favourites" in data:
-                fav = data["favourites"]
-                fav.remove((int(self.active_grid.text, 16), self.active_grid.font))
-                data["favourites"] = fav
-        self.active_grid.grid_forget()
+        with self.app.get_favourites() as data:
+            fav = data["favourites"]
+            fav.remove((self.active_grid.code_point, self.active_grid.font))
+            data["favourites"] = fav
+        self.active_grid.place_forget()
         self.grids.remove(self.active_grid)
         self.active_grid = None
+        self._re_place()
 
     def clear_favourites(self):
-        with shelve.open("data") as data:
-            if "favourites" in data:
-                data["favourites"] = []
+        self.app.set_favourites([])
         for grid in self.grids:
-            grid.grid_forget()
+            grid.place_forget()
         self.grids = []
 
+    def get_favourites(self):
+        return self.app.favourites_as_list()
+
+    def _re_place(self):
+        row, column, max_h = 0, 0, 6
+        for grid in self.grids:
+            grid.place(x=column * 40, y=row * 40, width=40, height=40)
+            if row == max_h - 1:
+                column += 1
+                row = 0
+            else:
+                row += 1
+        self.body.config(width=(column + 1) * 40, height=max_h * 40)
+
     def load_favourites(self):
-        with shelve.open("data") as data:
-            if "favourites" in data:
-                row, column = 0, 0
-                for grid_config in data["favourites"]:
-                    grid = Grid(self, font=(grid_config[1], 12))
-                    grid.set(grid_config[0])
-                    self.grids.append(grid)
-                    grid.grid(row=row, column=column)
-                    if row == 5:
-                        column += 1
-                        row = 0
-                    else:
-                        row += 1
+        row, column, max_h = 0, 0, 6
+        for grid_config in self.get_favourites():
+            grid = Grid(self, font=(grid_config[1], 12))
+            grid.set(grid_config[0])
+            self.grids.append(grid)
+            grid.place(x=column*40, y=row*40, width=40, height=40)
+            if row == max_h - 1:
+                column += 1
+                row = 0
+            else:
+                row += 1
+        self.body.config(width=(column+1)*40, height=max_h*40)

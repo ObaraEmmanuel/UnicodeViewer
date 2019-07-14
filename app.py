@@ -10,14 +10,6 @@ import shelve
 MAX_GRID_WIDTH, MAX_GRID_HEIGHT = 20, 10
 
 
-def add_to_favourites(grid: Grid) -> None:
-    with shelve.open("data") as data:
-        if "favourites" in data:
-            data["favourites"] += [(int(grid.text, 16), grid.font)]
-        else:
-            data["favourites"] = [(int(grid.text, 16), grid.font)]
-
-
 # noinspection PyArgumentList
 class App(Tk):
 
@@ -39,8 +31,8 @@ class App(Tk):
                                        ("\ue923", "Copy hexadecimal scalar", lambda: self.active_grid.copy(1)),
                                        ('separator',),
                                        ("\ue7a9", "Save as image", lambda: dialogs.SaveAsImage(self)),
-                                       ("\ue735", "add to favorites", lambda: add_to_favourites(self.active_grid)),
-                                       ("\ue946", "unicode info", lambda: dialogs.UnicodeInfo(self))
+                                       ("\ue735", "Add to favorites", lambda: self.toggle_from_favourites()),
+                                       ("\ue946", "Unicode info", lambda: dialogs.UnicodeInfo(self))
                                        )
         self._size = (MAX_GRID_WIDTH, MAX_GRID_HEIGHT)
         self.grids = []
@@ -74,6 +66,7 @@ class App(Tk):
         elif value[1] > MAX_GRID_HEIGHT:
             raise ValueError("Height set exceeds maximum: {}".format(MAX_GRID_HEIGHT))
         if self.size == value:
+            # This condition prevents dangerous recursions that may be
             return
         self._size = value
         w_lower_bound = (MAX_GRID_WIDTH - value[0]) // 2
@@ -92,13 +85,15 @@ class App(Tk):
                 grid.set(None)
 
     def init_grids(self):
-        for i in range(self.size[0]):
+        w_ratio = 1/MAX_GRID_WIDTH
+        h_ratio = 1/MAX_GRID_HEIGHT
+        for i in range(MAX_GRID_WIDTH):
             column = []
-            for j in range(self.size[1]):
+            for j in range(MAX_GRID_HEIGHT):
                 grid = Grid(self)
                 column.append(grid)
                 self.grid_cluster.append(grid)
-                grid.grid(row=j, column=i)
+                grid.place(relx=i*w_ratio, rely=j*h_ratio, relwidth=w_ratio, relheight=h_ratio)
             self.grids.append(column)
 
     @property
@@ -142,7 +137,43 @@ class App(Tk):
         self.render_thread = Thread(target=self._render, args=(from_, self.render_thread))
         self.render_thread.start()
 
+    @staticmethod
+    def get_favourites():
+        # Ensure that favourites key exists in data
+        descriptor = shelve.open("data")
+        if not descriptor.get("favourites"):
+            descriptor['favourites'] = []
+            descriptor.sync()
+        return descriptor
+
+    def favourites_as_list(self):
+        with self.get_favourites() as data:
+            return list(data["favourites"])
+
+    def set_favourites(self, value: list) -> None:
+        with self.get_favourites() as data:
+            data["favourites"] = value
+
+    def remove_favourites(self):
+        # Completely rip away the favourites key
+        with App.get_favourites() as data:
+            del data["favourites"]
+
+    def toggle_from_favourites(self) -> None:
+        grid = self.active_grid
+        with grid.app.get_favourites() as data:
+            if (grid.code_point, grid.font) in data["favourites"]:
+                fav = data["favourites"]
+                fav.remove((grid.code_point, grid.font))
+                data["favourites"] = fav
+            else:
+                data["favourites"] += [(int(grid.text, 16), grid.font)]
+
     def request_context_menu(self, event):
+        if (self.active_grid.code_point, self.active_grid.font) in self.favourites_as_list():
+            self.context_menu.entryconfigure(5, label="\ue735   Remove from favourites")
+        else:
+            self.context_menu.entryconfigure(5, label="\ue735   Add to favourites")
         try:
             self.context_menu.tk_popup(event.x_root, event.y_root)
         finally:
