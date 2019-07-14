@@ -1,6 +1,6 @@
 import unittest
 from tests.support import MockApp, MockEvent
-import random
+import widgets
 
 
 class GridTestCase(unittest.TestCase):
@@ -33,12 +33,6 @@ class GridTestCase(unittest.TestCase):
         self.grid.set(None)
         self.grid.lock()
         self.assertFalse(self.grid.is_locked, "Text required constraint failed")
-
-    def test_frame_to_label_bypass(self):
-        self.grid['bg'] = "#bbb"
-        self.assertEqual(self.grid._text['bg'], "#bbb", "Failed to bypass styles")
-        self.grid._text['bg'] = "#aaa"
-        self.assertEqual(self.grid['bg'], "#aaa", "Failed to bypass style access")
 
     def test_font_handling(self):
         test_fonts = (
@@ -85,6 +79,48 @@ class GridTestCase(unittest.TestCase):
         self.assertEqual(data["Font family"], "Arial Black", "Incorrect font returned")
         self.assertEqual(data["Code point"], "45000", "Incorrect code point returned")
         self.assertEqual(data["Hexadecimal scalar"], "afc8", "Incorrect hex scalar returned")
+
+
+class HexadecimalIntegerTestCase(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.widget = widgets.HexadecimalIntegerControl()
+
+    def test_get(self):
+        self.widget._data.set('45000')
+        self.assertEqual(self.widget.get(), 45000, 'Incorrect get value')
+        self.widget._data.set('ffff')
+        self.assertEqual(self.widget.get(), 65535, 'Incorrect get value')
+        self.widget._data.set('xyz')
+        self.assertEqual(self.widget.get(), 0, 'Incorrect get value')
+
+    def test_set(self):
+        self.widget.set('45000')
+        self.assertEqual(self.widget.get(), 45000, 'Incorrect value set')
+        self.widget.set('xyz')
+        self.assertEqual(self.widget.get(), 45000, 'Illegal value set')
+        self.widget.set('450000')
+        self.assertEqual(self.widget.get(), 45000, 'Incorrect get value')
+
+    def test_validator(self):
+        self.assertTrue(self.widget.validator('45000'), 'Validator failed')
+        self.assertTrue(self.widget.validator('ffff'), 'Validator failed')
+        self.assertFalse(self.widget.validator('450000'), 'Validator failed')
+        self.assertFalse(self.widget.validator('fffff'), 'Validator failed')
+
+
+class KeyValueLabelTestCase(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self.widget = widgets.KeyValueLabel(MockApp(), "key", "value")
+
+    def test_initialization(self):
+        self.assertEqual(self.widget._key['text'], "key", "Key set incorrectly")
+        self.assertEqual(self.widget._val['text'], "value", "Value set incorrectly")
+
+    def test_copy(self):
+        self.widget.copy(None)
+        self.assertEqual(self.widget.clipboard_get(), self.widget._val['text'], 'Copying failed')
 
 
 if __name__ == '__main__':

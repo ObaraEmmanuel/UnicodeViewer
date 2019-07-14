@@ -34,7 +34,7 @@ class InputBoxTestCase(unittest.TestCase):
 
     def test_range_rendering(self):
         self.component.input.set("50000")
-        self.app.render(self.component.input.get())
+        self.component.render_range()
         self.assertEqual(self.app._from, 50000, "Range not rendered correctly")
 
     def test_receives_range(self):
@@ -144,9 +144,10 @@ class FontSelectorTestCase(unittest.TestCase):
 
     def test_font_change(self):
         self.component.input.set(self.font)
+        self.component.value_changed()  # We need to do this since there is no mainloop to handle changes
         self.assertEqual(self.component.input.get(), self.font, "Font combobox failed")
         for grid in self.app.grid_cluster:
-            with self.subTest(grid=grid):
+            with self.subTest(grid=self.app.grid_cluster.index(grid)):
                 self.assertEqual(grid.font, self.font, "Could not change font uniformly")
 
     def test_font_filtering(self):
