@@ -1,6 +1,6 @@
 from tkinter import *
 import tkinter.ttk as ttk
-import components as Components
+import components
 from widgets import Grid, ContextMenu
 from threading import Thread
 from copy import copy
@@ -18,6 +18,12 @@ class App(Tk):
         self.geometry('800x500')
         self.config(bg='#5a5a5a')
         self.title("Unicode viewer")
+        # Icon resource is not accessible during tests so ignore the TclError raised
+        try:
+            self.iconbitmap("resources/unicode_viewer.ico")
+        except TclError:
+            pass
+
         self.resizable(0, 0)
         self.nav = Frame(self, bg="#5a5a5a")
         self.nav.place(x=0, y=0, relwidth=1, relheight=0.1)
@@ -40,13 +46,14 @@ class App(Tk):
         self.init_grids()
         self.active_grid = None
         # Plugin components here. Your component has to inherit the Component class
+        # Components not placed here will not be rendered or receive broadcast events
         self.components = [
-            Components.Swipe(self),
-            Components.InputBox(self),
-            Components.GridTracker(self),
-            Components.RenderSizeControl(self),
-            Components.FontSelector(self),
-            Components.FavouritesManager(self)
+            components.Swipe(self),
+            components.RenderRangeControl(self),
+            components.GridTracker(self),
+            components.RenderSizeControl(self),
+            components.FontSelector(self),
+            components.FavouritesManager(self)
         ]
         self._from = 0
         self.render_thread = None
