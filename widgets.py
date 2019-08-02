@@ -47,6 +47,8 @@ class HexadecimalIntegerControl(Entry):
             self._data.set(value)
 
     def validator(self, value: str) -> bool:
+        if value == "":
+            return True
         if value.isdigit():
             if int(value) <= 0xffff:
                 return True
@@ -56,6 +58,11 @@ class HexadecimalIntegerControl(Entry):
 
 
 def text_required(func):
+    """
+    Decorates Grid class methods that require a actively displaying grid to work.
+    :param func:
+    :return:
+    """
     def wrap(self, *args):
         if not self.text:
             pass
