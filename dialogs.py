@@ -1,9 +1,8 @@
-from tkinter import Toplevel, Label, Frame, ttk, filedialog
+from tkinter import Toplevel, Label, Frame, ttk, filedialog, TclError
 from widgets import KeyValueLabel, ScrolledGridHolder, Grid, ContextMenu
-import components as Components
+import components
 from PIL import ImageGrab
 import os
-import shelve
 
 
 def center_window(parent, child):
@@ -30,6 +29,12 @@ class BaseDialog(Toplevel):
         self.wm_transient(app)
         self.config(bg='#5a5a5a')
         self.resizable(0, 0)
+        # Icon resource is not accessible during tests so ignore the TclError raised
+        try:
+            self.iconbitmap("resources/unicode_viewer.ico")
+        except TclError:
+            pass
+
         try:
             self.grab_set()
             self.focus_force()
@@ -103,6 +108,10 @@ class SaveAsImage(BaseDialog):
                                             filetypes=[("Portable Network Graphics", "*.png")],
                                             initialdir=local_picture_location())
         if path:
+            # Ensure that file in pathname has an extension else append default extension png
+            head, file = os.path.split(path)
+            file = file if len(file.split(".")) > 1 else file + ".png"
+            path = os.path.join(head, file)
             self.image.save(path)
             self.destroy()
 
@@ -131,7 +140,7 @@ class ManageFavourites(BaseDialog):
                                        ("\ue946", "unicode info", lambda: UnicodeInfo(self))
                                        )
         self.components = [
-            Components.GridTracker(self)
+            components.GridTracker(self)
         ]
 
         ttk.Button(self.button_holder, text="Clear all", command=self.clear_favourites).pack(side='left', padx=5,
