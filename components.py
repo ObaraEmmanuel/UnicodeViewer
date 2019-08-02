@@ -27,7 +27,7 @@ class Component:
         self.app.components.remove(self)
 
 
-class InputBox(Component):
+class RenderRangeControl(Component):
 
     def __init__(self, app):
         super().__init__(app)
