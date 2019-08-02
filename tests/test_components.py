@@ -12,7 +12,7 @@ class InputBoxTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
         self.app = MockApp()
-        self.component = components.InputBox(self.app)
+        self.component = components.RenderRangeControl(self.app)
         self.app.components.append(self.component)
 
     def tearDown(self) -> None:
