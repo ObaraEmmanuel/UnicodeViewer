@@ -16,13 +16,6 @@ class AllDialogTestCase(unittest.TestCase):
         self.assertIsInstance(dialog, dialogs.UnicodeInfo)
         self.assertEqual(dialog.data, self.app.active_grid.data, "Wrong grid loaded")
 
-    def test_save_as_image(self):
-        self.app.grid_cluster[0].lock()
-        dialog = dialogs.SaveAsImage(self.app)
-        self.assertIsNone(dialog.image, "Premature image grabbing")
-        dialog.snip_img()
-        self.assertIsNotNone(dialog.image, "Image grab failed")
-
 
 class ManageFavouritesTestCase(unittest.TestCase):
 
