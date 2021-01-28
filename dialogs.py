@@ -1,7 +1,9 @@
-from tkinter import Toplevel, Label, Frame, ttk, filedialog, TclError
+from tkinter import Toplevel, Label, Frame, ttk, filedialog, TclError, messagebox
 from widgets import KeyValueLabel, ScrolledGridHolder, Grid, ContextMenu
 import components
-from PIL import ImageGrab
+import sys
+if sys.platform == "win32" or sys.platform == "darwin":
+    from PIL import ImageGrab
 import os
 
 
@@ -91,6 +93,12 @@ class SaveAsImage(BaseDialog):
         self.title("Save as image")
 
     def snip_img(self):
+        if sys.platform not in ("win32", "darwin"):
+            messagebox.showerror(
+                "Feature not supported",
+                "This feature is only supported in windows and Mac OS"
+            )
+            return
         self.update_idletasks()
         self.body.update_idletasks()
         self.image_label.update_idletasks()
@@ -102,8 +110,9 @@ class SaveAsImage(BaseDialog):
         self.image = image
 
     def save(self):
+        self.snip_img()
         if self.image is None:
-            self.snip_img()
+            return
         path = filedialog.asksaveasfilename(parent=self, initialfile="unicd.png",
                                             filetypes=[("Portable Network Graphics", "*.png")],
                                             initialdir=local_picture_location())
