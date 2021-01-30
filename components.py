@@ -116,7 +116,7 @@ class Swipe(Component):
 
     def prev_render(self):
         spread = self.app.current_range
-        self.app.render(spread[0] - (spread[1] - spread[0]))
+        self.app.render(max(spread[0] - (spread[1] - spread[0]), 0))
 
 
 class FontSelector(Component):
