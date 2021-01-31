@@ -20,7 +20,8 @@ class App(Tk):
         self.title("Unicode viewer")
         # Icon resource is not accessible during tests so ignore the TclError raised
         try:
-            self.iconbitmap("resources/unicode_viewer.ico")
+            self.icon = PhotoImage(file="resources/unicode_viewer.png")
+            self.iconphoto(True, self.icon)
         except TclError:
             pass
 
